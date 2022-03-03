@@ -1,0 +1,16 @@
+import os
+from LoadData2 import Dataset, loader, Dataset_val
+from torch.utils.data import DataLoader
+import torch
+
+print(torch.cuda.is_available())
+
+ds = Dataset('./')
+x,y= ds.__getitem__(0)
+print(y.shape)
+
+
+
+
+
+

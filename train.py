@@ -19,7 +19,7 @@ from LoadData2 import Dataset, loader, Dataset_val
 # Training settings
 parser = argparse.ArgumentParser(description='Example')
 parser.add_argument('--batchSize', type=int, default=36, help='training batch size')
-parser.add_argument('--niter', type=int, default=10000, help='number of epochs to train for')
+parser.add_argument('--niter', type=int, default=1000, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0002, help='Learning Rate. Default=0.02')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use, for now it only supports one GPU')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
@@ -30,7 +30,7 @@ parser.add_argument('--outpath', default='./outputs', help='folder to output ima
 opt = parser.parse_args()
 
 print(opt)
-
+opt.cuda = True
 
 try:
     os.makedirs(opt.outpath)
@@ -120,14 +120,15 @@ for epoch in range(opt.niter):
         output_masked = input.clone()
         input_mask = input.clone()
         #detach G from the network
+
         for d in range(3):
-            output_masked[:,d,:,:] = input_mask[:,d,:,:].unsqueeze(1) * output
+            output_masked[:,d,:,:] = (input_mask[:,d,:,:].unsqueeze(1) * output).squeeze()
         if cuda:
             output_masked = output_masked.cuda()
         result = NetC(output_masked)
         target_masked = input.clone()
         for d in range(3):
-            target_masked[:,d,:,:] = input_mask[:,d,:,:].unsqueeze(1) * target
+            target_masked[:,d,:,:] = (input_mask[:,d,:,:].unsqueeze(1) * target).squeeze()
         if cuda:
             target_masked = target_masked.cuda()
         target_D = NetC(target_masked)
@@ -143,12 +144,12 @@ for epoch in range(opt.niter):
         output = F.sigmoid(output)
 
         for d in range(3):
-            output_masked[:,d,:,:] = input_mask[:,d,:,:].unsqueeze(1) * output
+            output_masked[:,d,:,:] = (input_mask[:,d,:,:].unsqueeze(1) * output).squeeze()
         if cuda:
             output_masked = output_masked.cuda()
         result = NetC(output_masked)
         for d in range(3):
-            target_masked[:,d,:,:] = input_mask[:,d,:,:].unsqueeze(1) * target
+            target_masked[:,d,:,:] = (input_mask[:,d,:,:].unsqueeze(1) * target).squeeze()
         if cuda:
             target_masked = target_masked.cuda()
         target_G = NetC(target_masked)
@@ -158,9 +159,9 @@ for epoch in range(opt.niter):
         loss_G_joint.backward()
         optimizerG.step()
 
-    print("===> Epoch[{}]({}/{}): Batch Dice: {:.4f}".format(epoch, i, len(dataloader), 1 - loss_dice.data[0]))
-    print("===> Epoch[{}]({}/{}): G_Loss: {:.4f}".format(epoch, i, len(dataloader), loss_G.data[0]))
-    print("===> Epoch[{}]({}/{}): D_Loss: {:.4f}".format(epoch, i, len(dataloader), loss_D.data[0]))
+    print("===> Epoch[{}]({}/{}): Batch Dice: {:.4f}".format(epoch, i, len(dataloader), 1 - loss_dice.item()))
+    print("===> Epoch[{}]({}/{}): G_Loss: {:.4f}".format(epoch, i, len(dataloader), loss_G.item()))
+    print("===> Epoch[{}]({}/{}): D_Loss: {:.4f}".format(epoch, i, len(dataloader), loss_D.item()))
     vutils.save_image(data[0],
             '%s/input.png' % opt.outpath,
             normalize=True)
@@ -185,6 +186,7 @@ for epoch in range(opt.niter):
             pred_np = pred.data.cpu().numpy()
             gt = gt.data.cpu().numpy()
             for x in range(input.size()[0]):
+
                 IoU = np.sum(pred_np[x][gt[x]==1]) / float(np.sum(pred_np[x]) + np.sum(gt[x]) - np.sum(pred_np[x][gt[x]==1]))
                 dice = np.sum(pred_np[x][gt[x]==1])*2 / float(np.sum(pred_np[x]) + np.sum(gt[x]))
                 IoUs.append(IoU)
